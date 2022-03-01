@@ -1,22 +1,28 @@
+from pyautogui import press, typewrite, hotkey, moveTo, position
+import tkinter as tk
 import numpy as np
 import cv2
+import os
 from typing import Tuple
+import io
 import time
 import torch
-from PIL import Image, ImageOps, ImageTk
+from PIL import Image, ImageTk
+import tvm.contrib.graph_runtime as graph_runtime
+from mobilenet_v2_tsm import MobileNetV2
+import onnx
+import tvm
+import tvm.relay
 import torch.onnx
 from typing import Tuple
 import torchvision
-from pyautogui import press, typewrite, hotkey, moveTo, position
-#from helpers import *
-import tkinter as tk
+from helpers import *
 
 
 SOFTMAX_THRES = 0
 HISTORY_LOGIT = True
 n_still_frame = 0
 WINDOW_NAME = 'Video Gesture Recognition'
-
 
 categories = [
     "Doing other things",  # 0
@@ -53,7 +59,7 @@ class Application():
         self.WINDOW_NAME = 'Video Gesture Recognition'
         self.t = None
         self.index = 0
-        """
+        
         self.transform = get_transform()
         self.executor, self.ctx = get_executor()
         self.buffer = (
@@ -73,12 +79,12 @@ class Application():
         self.history_logit = []
         self.history_timing = []
         self.i_frame = -1
-        """
+        
 
         self.root = tk.Tk()
         self.canvas = tk.Canvas(self.root, width=600, height=300)
         self.canvas.grid(columnspan=7)
-        self.titleText = tk.Label(self.root, text="Title")
+        self.titleText = tk.Label(self.root, text="Automatic Action Recognition")
         self.titleText.grid(columnspan=3, column=2, row=0)
         self.camLabel = tk.Label(self.root)
         self.camLabel.grid(columnspan=3, column=2, row=1)
@@ -88,13 +94,57 @@ class Application():
 
 
     def runApp(self):
-        _, frame = self.cap.read()
-        cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = Image.fromarray(cv2image)
-        imgtk = ImageTk.PhotoImage(image=img)
-        self.camLabel.imgtk = imgtk
-        self.camLabel.configure(image=imgtk)
-        self.camLabel.after(10,self.runApp)
+            self.i_frame +=1
+            _, frame = self.cap.read()
+            cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img = Image.fromarray(cv2image)
+            imgtk = ImageTk.PhotoImage(image=img)
+            self.camLabel.imgtk = imgtk
+            self.camLabel.configure(image=imgtk)
+            if self.i_frame % 2 == 0:  # skip every other frame to obtain a suitable frame rate
+                t1 = time.time()
+                img_tran = self.transform([Image.fromarray(frame).convert('RGB')])
+                input_var = torch.autograd.Variable(img_tran.view(1, 3, img_tran.size(1), img_tran.size(2)))
+                img_nd = tvm.nd.array(input_var.detach().numpy(), ctx=self.ctx)
+                inputs: Tuple[tvm.nd.NDArray] = (img_nd,) + self.buffer
+                outputs = self.executor(inputs)
+                self.feat, self.buffer = outputs[0], outputs[1:]
+                assert isinstance(self.feat, tvm.nd.NDArray)
+                
+                if SOFTMAX_THRES > 0:
+                    feat_np = self.feat.asnumpy().reshape(-1)
+                    feat_np -= feat_np.max()
+                    softmax = np.exp(feat_np) / np.sum(np.exp(feat_np))
+
+                    print(max(softmax))
+                    if max(softmax) > SOFTMAX_THRES:
+                        idx_ = np.argmax(self.feat.asnumpy(), axis=1)[0]
+                    else:
+                        idx_ = self.idx
+                else:
+                    idx_ = np.argmax(self.feat.asnumpy(), axis=1)[0]
+
+                if HISTORY_LOGIT:
+                    self.history_logit.append(self.feat.asnumpy())
+                    self.history_logit = self.history_logit[-12:]
+                    avg_logit = sum(self.history_logit)
+                    idx_ = np.argmax(avg_logit, axis=1)[0]
+
+                self.idx, self.history = process_output(idx_, self.history)
+
+                t2 = time.time()
+                print(f"{self.index} {categories[self.idx]}")
+
+
+                current_time = t2 - t1
+
+            if self.t is None:
+                self.t = time.time()
+            else:
+                nt = time.time()
+                self.index += 1
+                self.t = nt
+            self.camLabel.after(1,self.runApp)
 
 
     """
@@ -173,3 +223,7 @@ class Application():
 
 
 app = Application()
+
+
+
+
