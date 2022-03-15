@@ -93,7 +93,8 @@ class Application():
         
 
         self.root = tk.Tk()
-        self.root.geometry("1920x1080")
+        self.root.geometry("960x600")
+        self.root.title("Automatic Action Recognition")
         self.appX = 1920
         self.appY = 1080
         self.app = tk.Frame(self.root, width=self.appX, height=self.appY, bg='white')
@@ -101,8 +102,8 @@ class Application():
 
         
         self.moveCamFactor = 50
-        self.ableToExecute = True
-        self.LeftClickFlag = False
+        self.gestureFlag = True
+        self.previousAction = ""
 
         self.camFrameX = 25
         self.camFrameY = 275
@@ -113,13 +114,30 @@ class Application():
         self.camLabel.pack()
         self.cam_stats = tk.Label(self.camFrame, text=str(1/self.current_time))
         self.cam_stats.pack()
+        self.cam_gesture = tk.Label(self.camFrame, text=str({categories[self.idx]}))
+        self.cam_gesture.pack()
+
+        self.previousGesture = 0
+        self.gestureFlag = False
 
         self.TopBar = tk.Frame(self.app, width=self.appX, height=100, bg='green')        
         self.TopBar.place(x=0,y=0)
         self.ToggleCamMovement = tk.Button(self.TopBar, text="ToggleCamMovement", bg='black', fg='white', command=self.toggle_canExecute)
         self.ToggleCamMovement.place(x=25, y=25)
 
+        self.variable = tk.StringVar(self.app)
+        self.variable.set("Select an action:")
+        self.action_list = ["Go Right", "Go Left"]
+        self.dropDown = tk.OptionMenu(self.app, self.variable, *self.action_list)
+        self.dropDown.place(x= 550, y= 380)
 
+        self.variableGesture = tk.StringVar(self.app)
+        self.variableGesture.set("Select a Gesture:")
+        self.gesture_list = ["Swipe Left", "Swipe Right"]
+        self.dropDown_gestures = tk.OptionMenu(self.app, self.variableGesture, *self.gesture_list)
+        self.dropDown_gestures.place(x=750, y=380)
+
+        self.ableToExecute = True
         self.cap = cv2.VideoCapture(0)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
@@ -144,6 +162,7 @@ class Application():
             imgtk = ImageTk.PhotoImage(image=img)
             self.camLabel.imgtk = imgtk
             self.camLabel.configure(image=imgtk)
+            self.cam_gesture.config(text=str({categories[self.idx]}))
 
 
 
@@ -179,8 +198,10 @@ class Application():
 
                 self.idx, self.history = process_output(idx_, self.history)
 
+
+
                 t2 = time.time()
-                #print(f"{self.index} {categories[self.idx]}")
+                print(f"{self.index} {categories[self.idx]}")
 
                 self.current_time = (t2 - t1)
                 self.cam_stats.configure(text=str(floor(1/self.current_time))+" Frames/second")
@@ -193,7 +214,8 @@ class Application():
                 self.t = nt
 
             #controller -- maybe need a fix for the delay
-            if self.ableToExecute:
+            
+            if self.idx != self.previousAction and self.ableToExecute:
                 if self.idx == 14:
                     pyautogui.click(button="left", clicks=1)
                 elif self.idx == 15:
@@ -202,11 +224,11 @@ class Application():
                 elif self.idx == 18:
                     #swipe up
                     self.camFrame.place(x=self.camFrameX,y=(self.camFrameY-self.moveCamFactor)) 
-            if not self.LeftClickFlag:
-                if self.idx == 14:
-                    self.LeftClickFlag = True
-                    #DO THE ACTION
-                    pyautogui.click(button='left')
+                elif self.idx == 16:
+                    pyautogui.press('left')
+                elif self.idx == 17:
+                    pyautogui.press('right')
+            self.previousAction = self.idx 
             
             self.camLabel.after(1,self.runApp)
 
