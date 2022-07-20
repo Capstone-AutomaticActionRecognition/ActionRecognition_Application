@@ -185,8 +185,6 @@ class Application():
             self.camLabel.configure(image=imgtk)
             self.cam_gesture.config(text=str({categories[self.idx]}))
 
-
-
             #Feature Mapping and Extraction
             if self.i_frame % 2 == 0:  # skip every other frame to obtain a suitable frame rate
                 t1 = time.time()
