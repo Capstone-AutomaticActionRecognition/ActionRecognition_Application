@@ -212,11 +212,11 @@ def process_output(idx_, history):
         idx_ = 2
     
     # history smoothing
+    
     if idx_ != history[-1]:
         if not (history[-1] == history[-2]): #  and history[-2] == history[-3]):
             idx_ = history[-1]
     
-
     history.append(idx_)
     history = history[-max_hist_len:]
 

@@ -80,7 +80,7 @@ class Application():
             tvm.nd.empty((1, 20, 7, 7), ctx=self.ctx)
         )
         self.idx = 0
-        self.history = [2]
+        self.history = [1,2,3]
         self.history_logit = []
         self.history_timing = []
         self.i_frame = -1
@@ -117,25 +117,32 @@ class Application():
         self.cam_gesture = tk.Label(self.camFrame, text=str({categories[self.idx]}))
         self.cam_gesture.pack()
 
-        self.previousGesture = 0
-        self.gestureFlag = False
-
         self.TopBar = tk.Frame(self.app, width=self.appX, height=100, bg='green')        
         self.TopBar.place(x=0,y=0)
-        self.ToggleCamMovement = tk.Button(self.TopBar, text="ToggleCamMovement", bg='black', fg='white', command=self.toggle_canExecute)
+        self.ToggleCamMovement = tk.Button(self.TopBar, text="ToggleMovement", bg='black', fg='white', command=self.toggle_canExecute)
         self.ToggleCamMovement.place(x=25, y=25)
+
+        self.enableGestureListRecord = tk.Button(self.TopBar, text="Record Gesture List", bg='black', fg='white', command=self.record_gesture_list)
+        self.enableGestureListRecord.place(x=200, y=25)
+        
+        self.recordGesturesRight = False
+        self.recordGesturesLeft = False
 
         self.variable = tk.StringVar(self.app)
         self.variable.set("Select an action:")
         self.action_list = ["Go Right", "Go Left"]
         self.dropDown = tk.OptionMenu(self.app, self.variable, *self.action_list)
-        self.dropDown.place(x= 550, y= 380)
+        self.dropDown.place(x= 200, y= 125)
 
         self.variableGesture = tk.StringVar(self.app)
         self.variableGesture.set("Select a Gesture:")
         self.gesture_list = ["Swipe Left", "Swipe Right"]
         self.dropDown_gestures = tk.OptionMenu(self.app, self.variableGesture, *self.gesture_list)
         self.dropDown_gestures.place(x=750, y=380)
+        self.dropDown_gestures.place_forget()
+
+        self.rightActions = [12,17]
+        self.leftActions = [11,16]
 
         self.ableToExecute = True
         self.cap = cv2.VideoCapture(0)
@@ -144,7 +151,21 @@ class Application():
         self.runApp()
         self.root.mainloop()
 
-
+    def record_gesture_list(self):
+        current_action = self.variable.get()
+        if current_action == "Go Left":
+            if self.recordGesturesLeft == False:
+                self.recordGesturesLeft = True
+            else:
+                self.recordGesturesLeft = False
+            return
+        elif current_action == "Go Right":
+            if self.recordGesturesRight == False:
+                self.recordGesturesRight = True
+            else:
+                self.recordGesturesRight = False
+            return
+        
     def toggle_canExecute(self):
         if self.ableToExecute:
             self.ableToExecute = False
@@ -215,21 +236,19 @@ class Application():
 
             #controller -- maybe need a fix for the delay
             
-            if self.idx != self.previousAction and self.ableToExecute:
-                if self.idx == 14:
-                    pyautogui.click(button="left", clicks=1)
-                elif self.idx == 15:
-                    #swipe down                
-                    self.camFrame.place(x=self.camFrameX,y=(self.camFrameY+self.moveCamFactor)) 
-                elif self.idx == 18:
-                    #swipe up
-                    self.camFrame.place(x=self.camFrameX,y=(self.camFrameY-self.moveCamFactor)) 
-                elif self.idx == 16:
-                    pyautogui.press('left')
-                elif self.idx == 17:
-                    pyautogui.press('right')
+            if self.idx == 14 and self.ableToExecute:
+                pyautogui.click(button="left", clicks=1)
+            elif self.idx == 15 and self.ableToExecute:
+                #swipe down                
+                self.camFrame.place(x=self.camFrameX,y=(self.camFrameY+self.moveCamFactor)) 
+            elif self.idx == 18 and self.ableToExecute:
+                #swipe up
+                self.camFrame.place(x=self.camFrameX,y=(self.camFrameY-self.moveCamFactor)) 
+            elif self.idx in self.leftActions and self.previousAction not in self.leftActions:
+                pyautogui.press('left')
+            elif self.idx in self.rightActions and self.previousAction not in self.rightActions:
+                pyautogui.press('right')
             self.previousAction = self.idx 
-            
             self.camLabel.after(1,self.runApp)
 
 app = Application()
